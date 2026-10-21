@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>משתלת ביצי הדרקון</title>
+<style>
+  :root {
+    --bg1: #2b1b5a; --bg2: #5b2a86; --card: #fff8e7; --ink: #3a2455;
+    --accent: #ff7a3d; --good: #2fb55a; --bad: #e5484d; --nest: #c98a4b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font-family: system-ui, "Arial Hebrew", Arial, sans-serif;
+    color: var(--ink); background: linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
+    display: flex; justify-content: center; padding: 16px;
+  }
+  #app { width: 100%; max-width: 640px; }
+  .card { background: var(--card); border-radius: 24px; padding: 20px; box-shadow: 0 8px 0 rgba(0,0,0,.25); }
+  h1 { margin: 0 0 4px; font-size: 2rem; text-align: center; }
+  h2 { margin: 0 0 8px; text-align: center; }
+  .sub { text-align: center; margin: 0 0 16px; }
+  button {
+    font: inherit; font-weight: 700; border: 0; border-radius: 16px; padding: 12px 18px; cursor: pointer;
+    background: var(--accent); color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,.25); touch-action: manipulation;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+  button:disabled { opacity: .6; cursor: default; }
+  button.alt { background: #7a5af8; }
+  button.ghost { background: #e9dcc0; color: var(--ink); }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 700; }
+  .topbar button { padding: 8px 14px; }
+
+  /* dragon art */
+  .dragon { width: 100%; height: 100%; display: block; overflow: visible; }
+  .locked .dragon { filter: brightness(0) opacity(.3); }
+  .bob .dragon { animation: bob 1.6s ease-in-out infinite; }
+
+  /* level map */
+  .map { background: linear-gradient(#bfe9ff, #d9f7c9 45%, #b9e6a0); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+  .node {
+    display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; border-radius: 22px; width: 86%;
+    background: #fff; border: 4px solid #e9dcc0; cursor: pointer; text-align: start; color: var(--ink);
+    box-shadow: 0 4px 0 rgba(0,0,0,.18); font-weight: 700;
+  }
+  .node:nth-of-type(odd) { align-self: flex-start; }
+  .node:nth-of-type(even) { align-self: flex-end; }
+  .node .av { width: 64px; height: 64px; flex: none; }
+  .node .info { flex: 1; }
+  .node small { display: block; font-weight: 400; }
+  .node .isl { font-size: 1.8rem; }
+  .node.open { border-color: var(--accent); animation: glow 1.5s ease-in-out infinite; }
+  .node.cleared { border-color: var(--good); }
+  .node.locked { cursor: not-allowed; opacity: .75; background: #eee; }
+  .trail { text-align: center; color: #6a8d4a; letter-spacing: .6em; font-weight: 700; line-height: 1; }
+
+  /* question */
+  .request { display: flex; align-items: center; gap: 12px; font-size: 1.2rem; margin-bottom: 8px; }
+  .request .face { width: 64px; height: 64px; flex: none; }
+  .bubble { background: #fff; border-radius: 16px; padding: 10px 14px; flex: 1; border: 3px solid #e9dcc0; }
+  .bubble b { color: var(--accent); }
+  .nest { direction: ltr;
+    background: radial-gradient(circle at 50% 30%, #dba468, var(--nest)); border-radius: 24px; padding: 14px;
+    display: flex; flex-direction: column; gap: 5px; align-items: center; margin: 10px 0;
+    box-shadow: inset 0 4px 8px rgba(0,0,0,.25);
+  }
+  .nrow { display: flex; align-items: center; gap: 6px; }
+  .slots { display: flex; gap: 3px; padding: 2px; border-radius: 12px; border: 3px dashed transparent; transition: border-color .15s, background .15s; }
+  .slots.hover { border-color: #fff; background: rgba(255,255,255,.25); }
+  .slot { width: var(--cell); height: calc(var(--cell) * 1.2); }
+  .slot.empty { border: 2px dashed rgba(255,255,255,.55); border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; }
+  .slot svg { width: 100%; height: 100%; display: block; }
+  .slot.pop svg { animation: pop .35s ease-out both; }
+  .wobble .slot svg { animation: wobble .25s ease-in-out infinite alternate; }
+  .count { width: 2.6rem; text-align: right; color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.6); font-size: .95rem; }
+
+  /* dragging */
+  .basket { display: flex; gap: 14px; align-items: flex-end; justify-content: center; flex-wrap: wrap; background: #f1e3c4; border-radius: 20px; padding: 10px; }
+  .basket .lbl { text-align: center; font-size: .8rem; margin-top: 4px; }
+  .drag { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; display: flex; gap: 3px; padding: 6px; background: #fff; border-radius: 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+  .drag .slot { height: calc(var(--cell) * 1.2); }
+  .drag.one .slot { width: calc(var(--cell) * 1.3); height: calc(var(--cell) * 1.56); }
+  .dragging { position: fixed; z-index: 99; pointer-events: none; transform: scale(1.12) rotate(-3deg); opacity: .92; box-shadow: 0 10px 18px rgba(0,0,0,.35); }
+
+  .total { text-align: center; font-size: 1.15rem; min-height: 1.7em; font-weight: 700; }
+  .ansbox { margin: 8px auto; width: 8rem; text-align: center; font-size: 2.2rem; font-weight: 700; background: #fff; border: 4px solid #e9dcc0; border-radius: 16px; padding: 2px; }
+  .ansbox.bad { animation: shake .3s; border-color: var(--bad); }
+  .ansbox.good { border-color: var(--good); color: var(--good); }
+  .keypad { direction: ltr; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 300px; margin: 0 auto; }
+  .keypad button { font-size: 1.5rem; padding: 10px 0; }
+  .keypad .ok { background: var(--good); }
+  .msg { text-align: center; font-size: 1.1rem; min-height: 2em; margin-top: 8px; font-weight: 700; }
+  .hatched { width: 110px; height: 110px; margin: 0 auto; animation: hatch 1s ease-out; }
+
+  .coll { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .coll > div { background: #fff; border-radius: 16px; padding: 10px 4px; text-align: center; border: 3px solid #e9dcc0; }
+  .coll .e { width: 70px; height: 70px; margin: 0 auto 4px; }
+  .coll small { display: block; }
+  .hero { width: 120px; height: 120px; margin: 0 auto; }
+
+  /* zombie battle */
+  .field { direction: ltr; position: relative; height: 230px; border-radius: 20px; overflow: hidden; background: linear-gradient(#3b2a6e, #6a4a9a 55%, #4f7a3a 55%, #3d6a2c); box-shadow: inset 0 4px 10px rgba(0,0,0,.3); }
+  .field .castle { position: absolute; left: 1%; bottom: 8px; font-size: 3.6rem; line-height: 1; }
+  .field .hero-slot { position: absolute; left: 17%; bottom: 8px; width: 16%; aspect-ratio: 1; }
+  .zombie { position: absolute; bottom: 8px; width: 14%; aspect-ratio: 1; transition: left .5s ease-in-out, transform .6s, opacity .6s; }
+  .zombie svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .zombie .hpbar { position: absolute; top: -16px; left: 4%; right: 4%; height: 13px; background: rgba(0,0,0,.5); border-radius: 6px; overflow: hidden; }
+  .zombie .hpbar span { position: absolute; inset: 0; text-align: center; font-size: 10px; line-height: 13px; font-weight: 700; color: #fff; text-shadow: 0 1px 1px #000; }
+  .zombie .hpbar i { display: block; height: 100%; background: var(--bad); transition: width .3s; }
+  .zombie.hit svg { animation: shake .3s; filter: brightness(1.8); }
+  .zombie.down { transform: rotate(80deg) translateY(30%); opacity: 0; }
+  .zombie.bite svg { animation: shake .3s 2; }
+  .fire { position: absolute; bottom: 30%; left: 30%; font-size: 2.2rem; line-height: 1; pointer-events: none; }
+  .team { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
+  .fighter { display: flex; flex-direction: column; align-items: center; width: 96px; padding: 8px 4px; background: #fff; color: var(--ink); border: 3px solid #e9dcc0; font-size: .85rem; }
+  .fighter .av { width: 60px; height: 60px; }
+  .fighter small { font-weight: 400; }
+  .fighter:hover { border-color: var(--accent); }
+
+  @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  @keyframes hatch { 0% { transform: scale(.2) rotate(-25deg); } 60% { transform: scale(1.3) rotate(10deg); } 100% { transform: scale(1); } }
+  @keyframes bob { 50% { transform: translateY(-5px); } }
+  @keyframes wobble { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+  @keyframes glow { 50% { box-shadow: 0 4px 0 rgba(0,0,0,.18), 0 0 18px 4px rgba(255,122,61,.7); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ===== Dragons: one per times table, drawn as SVG from a few traits =====
+const DRAGONS = {
+  2:  { name: "פיפ",    c: "#ffd34d", dk: "#e6a800", bel: "#fff2b8", horn: "none",  wing: "small", mark: "spots" },
+  3:  { name: "זיפי",   c: "#5fd068", dk: "#2e9e3e", bel: "#d9f7c9", horn: "small", wing: "small", mark: "none" },
+  4:  { name: "גחלת",   c: "#ff6b4a", dk: "#c93a1c", bel: "#ffd0a6", horn: "small", wing: "big",   mark: "none" },
+  5:  { name: "בועות", c: "#4aa8ff", dk: "#2175cc", bel: "#cdeaff", horn: "fin",   wing: "small", mark: "spots" },
+  6:  { name: "שזיף",    c: "#a66bff", dk: "#6f3fc4", bel: "#e6d3ff", horn: "big",   wing: "big",   mark: "none" },
+  7:  { name: "כפור",  c: "#7de3e3", dk: "#2fa9b5", bel: "#e6ffff", horn: "fin",   wing: "big",   mark: "star" },
+  8:  { name: "להבה",   c: "#ff9a2e", dk: "#d3620a", bel: "#ffe2a8", horn: "big",   wing: "big",   mark: "spots" },
+  9:  { name: "ורדית",   c: "#ff8fc0", dk: "#d4508c", bel: "#ffe0ef", horn: "ears",  wing: "small", mark: "heart" },
+  10: { name: "נצנץ", c: "#ffc933", dk: "#d49a00", bel: "#fff4c2", horn: "crown", wing: "big",   mark: "star" },
+};
+const LEVELS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+const ISLANDS = ["🌴", "🌲", "🌋", "🏖️", "🍄", "❄️", "🏜️", "🌊", "🏰"];
+const ROUND_LENGTH = 5, MASTER_LENGTH = 8, PASS_MARK = 3;
+
+function dragonSVG(d) {
+  const { c, dk, bel, horn, wing, mark } = d;
+  let s = `<svg class="dragon" viewBox="0 0 100 100" aria-hidden="true">`;
+  s += `<path d="M66 84 Q94 88 90 62 Q84 76 68 74 Z" fill="${c}"/><path d="M90 62 L97 57 L94 69 Z" fill="${dk}"/>`;
+  if (wing !== "none") {
+    const k = wing === "big" ? 1 : .7;
+    const w = `<path d="M0 0 Q-30 -8 -36 -36 Q-20 -28 -15 -32 Q-12 -14 0 -14 Z" fill="${dk}"/>`;
+    s += `<g transform="translate(32 62) scale(${k})">${w}</g><g transform="translate(68 62) scale(${-k} ${k})">${w}</g>`;
+  }
+  s += `<ellipse cx="50" cy="70" rx="23" ry="22" fill="${c}"/><ellipse cx="50" cy="76" rx="14" ry="15" fill="${bel}"/>`;
+  s += `<path d="M42 72 h16 M43 79 h14" stroke="${c}" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>`;
+  s += `<ellipse cx="37" cy="91" rx="9" ry="5" fill="${dk}"/><ellipse cx="63" cy="91" rx="9" ry="5" fill="${dk}"/>`;
+  if (horn === "small") s += `<path d="M33 26 L37 10 L45 21 Z M67 26 L63 10 L55 21 Z" fill="${dk}"/>`;
+  if (horn === "big") s += `<path d="M31 29 Q26 10 36 3 Q38 14 46 22 Z M69 29 Q74 10 64 3 Q62 14 54 22 Z" fill="${dk}"/>`;
+  if (horn === "ears") s += `<ellipse cx="33" cy="19" rx="7" ry="14" transform="rotate(-18 33 19)" fill="${c}"/><ellipse cx="33" cy="20" rx="3.5" ry="9" transform="rotate(-18 33 20)" fill="#ffb3d1"/><ellipse cx="67" cy="19" rx="7" ry="14" transform="rotate(18 67 19)" fill="${c}"/><ellipse cx="67" cy="20" rx="3.5" ry="9" transform="rotate(18 67 20)" fill="#ffb3d1"/>`;
+  if (horn === "fin") s += `<path d="M50 10 Q38 20 34 32 L66 32 Q62 20 50 10 Z" fill="${dk}"/><path d="M26 38 L14 30 L22 46 Z M74 38 L86 30 L78 46 Z" fill="${dk}"/>`;
+  s += `<circle cx="50" cy="42" r="26" fill="${c}"/><ellipse cx="50" cy="52" rx="14" ry="10" fill="${bel}"/>`;
+  s += `<circle cx="45" cy="50" r="1.5" fill="${dk}"/><circle cx="55" cy="50" r="1.5" fill="${dk}"/>`;
+  s += `<circle cx="39" cy="39" r="7.5" fill="#fff"/><circle cx="61" cy="39" r="7.5" fill="#fff"/>`;
+  s += `<circle cx="40.5" cy="40.5" r="4.4" fill="#2a1a3a"/><circle cx="62.5" cy="40.5" r="4.4" fill="#2a1a3a"/>`;
+  s += `<circle cx="42" cy="38.5" r="1.7" fill="#fff"/><circle cx="64" cy="38.5" r="1.7" fill="#fff"/>`;
+  s += `<circle cx="29" cy="50" r="4" fill="#ff9db1" opacity=".7"/><circle cx="71" cy="50" r="4" fill="#ff9db1" opacity=".7"/>`;
+  s += `<path d="M44 56 Q50 62 56 56" stroke="#2a1a3a" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  if (mark === "spots") s += `<circle cx="58" cy="24" r="3" fill="${dk}" opacity=".5"/><circle cx="46" cy="22" r="2" fill="${dk}" opacity=".5"/><circle cx="62" cy="68" r="3" fill="${dk}" opacity=".4"/>`;
+  if (mark === "star") s += `<text x="50" y="30" font-size="11" text-anchor="middle" fill="#ffd34d" stroke="#c98a00" stroke-width=".5">★</text>`;
+  if (mark === "heart") s += `<text x="50" y="82" font-size="12" text-anchor="middle" fill="#ff5c9a">♥</text>`;
+  if (horn === "crown") s += `<path d="M36 20 L36 6 L43 13 L50 2 L57 13 L64 6 L64 20 Z" fill="#ffd34d" stroke="#d49a00" stroke-width="1.5" stroke-linejoin="round"/>`;
+  return s + `</svg>`;
+}
+
+// ===== Zombies: one kind per map level, each tougher than the last =====
+const ZTYPES = [
+  { name: "זומבי מתנדנד",      hp: 8,  skin: "#9ad06f", shirt: "#7a5cc0", hat: "" },
+  { name: "זומבי עם קונוס",        hp: 10, skin: "#9ad06f", shirt: "#e08a2e", hat: `<path d="M34 16 L50 -8 L66 16 Z" fill="#ff8a1e"/><path d="M39 7 H61 M43 -1 H57" stroke="#fff" stroke-width="3"/>` },
+  { name: "זומבי עם דלי",      hp: 13, skin: "#a6c97a", shirt: "#3f8f7a", hat: `<path d="M32 4 H68 L64 22 H36 Z" fill="#9aa5b1" stroke="#6b7682" stroke-width="2"/><path d="M34 11 H66" stroke="#6b7682" stroke-width="2"/>` },
+  { name: "זומבי עם כובע גרב",      hp: 16, skin: "#8fcf8a", shirt: "#c94a6a", hat: `<path d="M30 20 Q50 -8 70 20 Z" fill="#e5484d"/><rect x="29" y="18" width="42" height="7" rx="3" fill="#fff"/><circle cx="50" cy="-1" r="5" fill="#fff"/>` },
+  { name: "זומבי עם קסדה",      hp: 19, skin: "#9ac3a0", shirt: "#2175cc", hat: `<path d="M28 26 Q28 4 50 4 Q72 4 72 26 Z" fill="#2175cc"/><path d="M50 4 V22" stroke="#fff" stroke-width="4"/>` },
+  { name: "זומבי קוסם",      hp: 22, skin: "#a8d08a", shirt: "#6f3fc4", hat: `<path d="M32 18 L52 -12 L68 18 Z" fill="#6f3fc4"/><ellipse cx="50" cy="18" rx="26" ry="5" fill="#6f3fc4"/><text x="52" y="10" font-size="10" text-anchor="middle" fill="#ffd34d">★</text>` },
+  { name: "זומבי ויקינג",      hp: 25, skin: "#93c47d", shirt: "#8a5a2b", hat: `<path d="M30 22 Q30 6 50 6 Q70 6 70 22 Z" fill="#b8bec6"/><path d="M30 18 Q16 14 19 0 Q26 10 33 10 Z M70 18 Q84 14 81 0 Q74 10 67 10 Z" fill="#fff8e7" stroke="#c9b98f"/>` },
+  { name: "זומבי אביר",      hp: 28, skin: "#9cc7a2", shirt: "#7b8794", hat: `<path d="M28 24 Q28 4 50 4 Q72 4 72 24 Z" fill="#c4cad2" stroke="#8a929c" stroke-width="2"/><rect x="47" y="22" width="6" height="14" fill="#8a929c"/><path d="M50 4 Q50 -8 63 -5" stroke="#e5484d" stroke-width="4" fill="none"/>` },
+  { name: "מלך הזומבים",        hp: 32, skin: "#8ed0b0", shirt: "#c0392b", hat: `<path d="M32 18 L32 2 L41 10 L50 -2 L59 10 L68 2 L68 18 Z" fill="#ffd34d" stroke="#d49a00" stroke-width="2" stroke-linejoin="round"/>`, cape: true },
+];
+
+// A goofy (not scary) zombie, facing left toward the castle.
+function zombieSVG(z = ZTYPES[0]) {
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    ${z.cape ? `<path d="M36 52 L18 92 L42 84 Z M64 52 L82 92 L58 84 Z" fill="#7a1f16"/>` : ""}
+    <rect x="37" y="76" width="10" height="18" rx="4" fill="#4a3a6a"/><rect x="54" y="76" width="10" height="18" rx="4" fill="#4a3a6a"/>
+    <ellipse cx="40" cy="95" rx="9" ry="4" fill="#2a1a3a"/><ellipse cx="58" cy="95" rx="9" ry="4" fill="#2a1a3a"/>
+    <path d="M38 62 L8 55 M38 70 L10 72" stroke="${z.skin}" stroke-width="9" stroke-linecap="round"/>
+    <rect x="34" y="52" width="32" height="30" rx="9" fill="${z.shirt}"/><path d="M34 74 l6 6 l6 -6 l6 6 l6 -6 l8 6 V82 H34 Z" fill="${z.shirt}"/>
+    <path d="M44 56 l4 10 M56 58 l-3 8" stroke="#000" stroke-opacity=".2" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="50" cy="34" r="22" fill="${z.skin}"/>
+    ${z.hat ? "" : `<path d="M36 14 l-3 -8 M46 12 l-1 -9 M56 13 l3 -8" stroke="#3a2a4a" stroke-width="3" stroke-linecap="round"/>`}
+    <circle cx="41" cy="30" r="8" fill="#fff"/><circle cx="60" cy="32" r="6" fill="#fff"/>
+    <circle cx="39" cy="31" r="3.5" fill="#2a1a3a"/><circle cx="58" cy="33" r="2.8" fill="#2a1a3a"/>
+    <path d="M38 47 Q50 55 63 46" stroke="#2a1a3a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M44 49 v4 M51 51 v4 M57 49 v4" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <path d="M62 40 l8 4 M64 44 l7 -1" stroke="#000" stroke-opacity=".3" stroke-width="1.5" stroke-linecap="round"/>
+    ${z.hat}
+  </svg>`;
+}
+
+function eggSVG(d) {
+  return `<svg viewBox="0 0 40 50" aria-hidden="true"><path d="M20 2 C31 2 38 24 38 33 C38 43 30 48 20 48 C10 48 2 43 2 33 C2 24 9 2 20 2 Z" fill="${d.c}" stroke="${d.dk}" stroke-width="2"/><circle cx="14" cy="30" r="3.5" fill="${d.bel}"/><circle cx="26" cy="22" r="3" fill="${d.bel}"/><circle cx="24" cy="37" r="2.5" fill="${d.bel}"/><ellipse cx="14" cy="14" rx="3" ry="5" transform="rotate(25 14 14)" fill="#fff" opacity=".45"/></svg>`;
+}
+
+// ===== Sounds: all synthesized, no audio files =====
+let audio = null, muted = false;
+try { muted = localStorage.getItem("mutedHe") === "1"; } catch {}
+function ensureAudio() {
+  if (muted) return null;
+  if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+function tone(freq, at, dur, { type = "sine", vol = .18, to = null } = {}) {
+  const a = ensureAudio(); if (!a) return;
+  const t = a.currentTime + at, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + .015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .05);
+}
+function crack(at, dur = .09) {
+  const a = ensureAudio(); if (!a) return;
+  const n = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+  const src = a.createBufferSource(), g = a.createGain();
+  src.buffer = buf; g.gain.value = .35; src.connect(g).connect(a.destination); src.start(a.currentTime + at);
+}
+const NOTE = { C: 523.25, D: 587.33, E: 659.25, G: 783.99, A: 880, C2: 1046.5, E2: 1318.5 };
+const sfx = {
+  pick: () => tone(660, 0, .06, { type: "triangle", vol: .1 }),
+  place: n => tone(380 + (n % 12) * 28, 0, .12, { type: "triangle", to: 260 + (n % 12) * 20 }),
+  row: () => [0, 1, 2].forEach(i => tone(400 + i * 120, i * .05, .1, { type: "triangle" })),
+  key: () => tone(500, 0, .05, { type: "square", vol: .05 }),
+  wrong: () => { tone(300, 0, .18, { type: "sawtooth", vol: .1, to: 200 }); tone(220, .15, .25, { type: "sawtooth", vol: .1, to: 140 }); },
+  right: () => [NOTE.C, NOTE.E, NOTE.G, NOTE.C2].forEach((f, i) => tone(f, i * .09, .22, { type: "triangle" })),
+  wobble: () => [0, .18, .36].forEach(t => { crack(t, .05); tone(240, t, .1, { type: "square", vol: .05 }); }),
+  hatch: () => {
+    crack(0); crack(.1, .05);
+    tone(300, .15, .35, { type: "sawtooth", vol: .12, to: 120 });               // tiny roar
+    [NOTE.G, NOTE.C2, NOTE.E2, NOTE.G * 2].forEach((f, i) => tone(f, .3 + i * .08, .3, { type: "sine", vol: .14 }));
+  },
+  groan: () => tone(120, 0, .45, { type: "sawtooth", vol: .1, to: 65 }),
+  unlock: () =>[NOTE.C, NOTE.E, NOTE.G, NOTE.C2, 0, NOTE.G, NOTE.C2, NOTE.E2].forEach((f, i) => f && tone(f, i * .12, .3, { type: "triangle" })),
+};
+// One sound per dragon attack.
+const attackSfx = {
+  lava:    () => { crack(0, .5); tone(90, 0, .5, { type: "sawtooth", vol: .14, to: 45 }); tone(220, .25, .3, { type: "square", vol: .05, to: 90 }); },
+  leaf:    () => [0, .07, .14, .21].forEach(t => { crack(t, .06); tone(1200 + t * 3000, t, .08, { type: "triangle", vol: .05 }); }),
+  fire:    () => { crack(0, .35); tone(700, 0, .35, { type: "sawtooth", vol: .1, to: 180 }); },
+  bubble:  () => [0, .1, .2].forEach((t, i) => tone(400 + i * 150, t, .12, { type: "sine", vol: .14, to: 900 + i * 150 })),
+  spore:   () => [0, .1, .2].forEach(t => tone(180, t, .08, { type: "square", vol: .08, to: 90 })),
+  ice:     () => [2093, 1760, 1568, 1318].forEach((f, i) => tone(f, i * .06, .18, { type: "sine", vol: .1 })),
+  coconut: () => { tone(260, 0, .15, { type: "sine", vol: .2, to: 110 }); tone(90, .3, .15, { type: "sine", vol: .25, to: 50 }); },
+  heart:   () => [NOTE.C, NOTE.E, NOTE.G].forEach((f, i) => tone(f, i * .08, .2, { type: "sine", vol: .14 })),
+  star:    () => [NOTE.G, NOTE.C2, NOTE.E2, NOTE.G * 2].forEach((f, i) => tone(f, i * .06, .2, { type: "triangle", vol: .12 })),
+};
+function toggleMute() {
+  muted = !muted;
+  try { localStorage.setItem("mutedHe", muted ? "1" : "0"); } catch {}
+  document.querySelectorAll(".mute").forEach(b => b.textContent = muted ? "🔇" : "🔊");
+  if (!muted) sfx.pick();
+}
+const muteBtn = () => `<button class="ghost mute" aria-label="צליל פועל או כבוי">${muted ? "🔇" : "🔊"}</button>`;
+function bindMute() { document.querySelectorAll(".mute").forEach(b => b.onclick = toggleMute); }
+
+// ===== Save data =====
+const app = document.getElementById("app");
+function loadSave() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem("dragonsHeV2") || "{}"); } catch {}
+  s.hatched = s.hatched || {};
+  s.best = s.best || {};
+  return s;
+}
+function writeSave() { try { localStorage.setItem("dragonsHeV2", JSON.stringify(save)); } catch {} }
+let save = loadSave();
+
+const ltr = s => "\u2066" + s + "\u2069";          // keep equations like 6 × 7 left-to-right inside Hebrew text
+const rand = n => Math.floor(Math.random() * n);
+const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+const cleared = t => (save.best[t] || 0) >= PASS_MARK;
+const unlockAll = () => location.hash === "#unlock";
+const unlocked = t => unlockAll() || t === LEVELS[0] || cleared(LEVELS[LEVELS.indexOf(t) - 1]);
+const masterUnlocked = () => unlockAll() || LEVELS.every(cleared);
+const medal = n => n >= 5 ? 3 : n === 4 ? 2 : n >= PASS_MARK ? 1 : 0;
+
+// ===== Map screen (home) =====
+function showMap() {
+  battle = null;
+  const nodes = LEVELS.map((t, i) => {
+    const d = DRAGONS[t], open = unlocked(t), done = cleared(t), m = medal(save.best[t] || 0);
+    const cls = done ? "cleared" : open ? "open" : "locked";
+    const status = !open ? "🔒 סיימו את השלב הקודם" : done ? "⭐".repeat(m) + "☆".repeat(3 - m) : "לחצו כדי לשחק!";
+    return `<button class="node ${cls}" data-t="${t}" ${open ? "" : "aria-disabled='true'"}>
+      <span class="av ${open ? "bob" : "locked"}">${dragonSVG(d)}</span>
+      <span class="info">לוח הכפל של ${t}<small>${open ? d.name : "???"} · ${status}</small></span>
+      <span class="isl">${ISLANDS[i]}</span></button>`;
+  });
+  const mu = masterUnlocked();
+  const master = `<button class="node ${mu ? "open" : "locked"}" data-t="mix">
+      <span class="av" style="font-size:3rem;text-align:center">🏆</span>
+      <span class="info">מיקס אלוף הדרקונים<small>${mu ? "כל לוחות הכפל!" : "🔒 סיימו את כל השלבים"}</small></span></button>`;
+  app.innerHTML = `
+    <div class="card">
+      <div class="topbar"><span></span>${muteBtn()}</div>
+      <div class="hero bob">${dragonSVG(DRAGONS[4])}</div>
+      <h1>משתלת ביצי הדרקון</h1>
+      <p class="sub">בנו קנים, בקעו דרקונים וטיילו במפה!</p>
+      <div class="map">${nodes.join('<div class="trail">· · ·</div>')}<div class="trail">· · ·</div>${master}</div>
+      <div class="row"><button class="alt" id="coll">הדרקונים שלי 🐲</button>
+        <button id="zbattle" ${army().length ? "" : "disabled"}>קרב זומבים 🧟</button></div>
+      ${army().length ? "" : `<p class="sub">בקעו דרקון כדי לפתוח את קרב הזומבים!</p>`}
+    </div>`;
+  bindMute();
+  document.getElementById("zbattle").onclick = startBattle;
+  app.querySelectorAll(".node").forEach(b => b.onclick = () => {
+    const t = b.dataset.t;
+    if (t === "mix" ? !masterUnlocked() : !unlocked(Number(t))) return sfx.wrong();
+    startRound(t);
+  });
+  document.getElementById("coll").onclick = showCollection;
+}
+
+function showCollection() {
+  const cells = LEVELS.map(t => {
+    const d = DRAGONS[t], n = save.hatched[t] || 0;
+    return `<div class="${n ? "" : "locked"}"><div class="e">${dragonSVG(d)}</div><b>${n ? d.name : "???"}</b><small>לוח הכפל של ${t}${n ? ` · בקעו ${n}` : ""}</small></div>`;
+  }).join("");
+  app.innerHTML = `<div class="card"><h1>הדרקונים שלי</h1><p class="sub">בקעו ביצים מלוח כפל כדי לפגוש את הדרקון שלו.</p>
+    <div class="coll">${cells}</div><div class="row"><button id="back">חזרה למפה</button></div></div>`;
+  document.getElementById("back").onclick = showMap;
+}
+
+// ===== Round logic =====
+let round = null, typed = "";
+
+function startRound(level) {
+  ensureAudio();
+  battle = null;
+  const qs = [];
+  if (level === "mix") {
+    for (let i = 0; i < MASTER_LENGTH; i++) qs.push({ table: LEVELS[rand(LEVELS.length)], other: 1 + rand(10) });
+  } else {
+    shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).slice(0, ROUND_LENGTH).forEach(o => qs.push({ table: Number(level), other: o }));
+  }
+  qs.forEach(q => {
+    const swap = Math.random() < .5;
+    q.rows = swap ? q.other : q.table; q.cols = swap ? q.table : q.other;
+  });
+  round = { level, qs, i: 0, stars: 0, q: null };
+  nextQuestion();
+}
+
+function nextQuestion() {
+  if (round.i >= round.qs.length) return showResults();
+  round.q = Object.assign(round.qs[round.i], { misses: 0, hinted: false, phase: "build" });
+  renderQuestion();
+}
+
+function cellSize(rows, cols) {
+  const byWidth = Math.floor((Math.min(window.innerWidth, 640) - 150) / cols) - 4;
+  const byHeight = Math.floor(360 / rows / 1.2) - 4;
+  return Math.max(16, Math.min(36, byWidth, byHeight));
+}
+
+function renderQuestion() {
+  const q = round.q, d = DRAGONS[q.table], { rows, cols } = q;
+  const trayEggs = `<div class="slot">${eggSVG(d)}</div>`.repeat(cols);
+  app.innerHTML = `
+    <div class="card" id="card" style="--cell:${cellSize(rows, cols)}px">
+      <div class="topbar"><button class="ghost" id="home">✕</button><span>קן ${round.i + 1} מתוך ${round.qs.length} · ⭐ ${round.stars}</span>${muteBtn()}</div>
+      <div class="request"><span class="face bob">${dragonSVG(d)}</span>
+        <div class="bubble">${d.name} רוצה <b>${rows === 1 ? "שורה אחת" : rows + " שורות"}</b> עם <b>${cols === 1 ? "ביצה אחת" : cols + " ביצים"}</b> בכל שורה!</div></div>
+      <div class="nest" id="nest"></div>
+      <div id="panel">
+        <div class="basket">
+          <div><div class="drag tray" data-kind="tray">${trayEggs}</div><div class="lbl">גררו שורה שלמה</div></div>
+          <div><div class="drag one" data-kind="egg"><div class="slot">${eggSVG(d)}</div></div><div class="lbl">או ביצה אחת</div></div>
+        </div>
+        <div class="total">גררו ביצים אל הקן! 👆</div>
+      </div>
+      <div class="msg" id="msg"></div>
+    </div>`;
+  document.getElementById("home").onclick = showMap;
+  bindMute();
+  buildNest(q, false);
+  document.querySelectorAll(".drag").forEach(el => makeDraggable(el, el.dataset.kind));
+}
+
+function buildNest(q, full) {
+  const nest = document.getElementById("nest"), d = DRAGONS[q.table];
+  nest.innerHTML = "";
+  q.grid = []; q.rowEls = []; q.slotEls = [];
+  for (let r = 0; r < q.rows; r++) {
+    const row = document.createElement("div");
+    row.className = "nrow";
+    row.innerHTML = `<div class="slots">${`<div class="slot ${full ? "" : "empty"}">${full ? eggSVG(d) : ""}</div>`.repeat(q.cols)}</div><span class="count">${full ? (r + 1) * q.cols : ""}</span>`;
+    nest.appendChild(row);
+    q.rowEls.push(row);
+    q.slotEls.push([...row.querySelectorAll(".slot")]);
+    q.grid.push(Array(q.cols).fill(full));
+    row.querySelector(".slots").onclick = () => { if (q.phase === "build") fillRow(r); };
+  }
+}
+
+function placeEgg(r, c, delay = 0) {
+  const q = round.q;
+  if (q.grid[r][c]) return false;
+  q.grid[r][c] = true;
+  const el = q.slotEls[r][c];
+  el.classList.remove("empty");
+  el.classList.add("pop");
+  el.innerHTML = eggSVG(DRAGONS[q.table]);
+  el.firstChild.style.animationDelay = `${delay}ms`;
+  return true;
+}
+
+function fillRow(r) {
+  const q = round.q;
+  let added = 0;
+  for (let c = 0; c < q.cols; c++) if (placeEgg(r, c, added * 35)) added++;
+  if (added) { sfx.row(); afterPlace(); }
+}
+
+function placeOne(r, c) {
+  const q = round.q;
+  if (q.grid[r][c]) c = q.grid[r].indexOf(false);      // slot taken: use first free slot in the row
+  if (c < 0) return;
+  let n = 0;
+  q.grid.forEach(g => g.forEach(v => n += v));
+  placeEgg(r, c);
+  sfx.place(n);
+  afterPlace();
+}
+
+function afterPlace() {
+  const q = round.q;
+  if (q.phase === "build" && q.grid.every(g => g.every(Boolean))) {
+    q.phase = "answer";
+    setTimeout(showAnswer, 500);
+  }
+}
+
+// ----- drag and drop (pointer events: mouse, touch, pen) -----
+function makeDraggable(el, kind) {
+  el.addEventListener("pointerdown", e => {
+    if (round.q.phase !== "build") return;
+    e.preventDefault();
+    ensureAudio(); sfx.pick();
+    const lift = e.pointerType === "touch" ? 54 : 0;     // keep the egg visible above a finger
+    const ghost = el.cloneNode(true);
+    ghost.classList.add("dragging");
+    ghost.style.setProperty("--cell", getComputedStyle(el).getPropertyValue("--cell") || document.getElementById("card").style.getPropertyValue("--cell"));
+    document.body.appendChild(ghost);
+    const rect = el.getBoundingClientRect();
+    ghost.style.width = rect.width + "px";
+    let hoverRow = null;
+    const at = ev => {
+      const x = ev.clientX, y = ev.clientY - lift;
+      ghost.style.left = x - rect.width / 2 + "px";
+      ghost.style.top = y - rect.height / 2 + "px";
+      return document.elementFromPoint(x, y);
+    };
+    const rowOf = node => node && node.closest(".nrow");
+    const move = ev => {
+      const row = rowOf(at(ev));
+      if (row !== hoverRow) {
+        if (hoverRow) hoverRow.querySelector(".slots").classList.remove("hover");
+        hoverRow = row;
+        if (row) row.querySelector(".slots").classList.add("hover");
+      }
+    };
+    const end = ev => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      const target = ev.type === "pointercancel" ? null : at(ev);
+      ghost.remove();
+      if (hoverRow) hoverRow.querySelector(".slots").classList.remove("hover");
+      const row = rowOf(target);
+      if (!row) return;
+      const r = round.q.rowEls.indexOf(row);
+      if (kind === "tray") fillRow(r);
+      else {
+        const slot = target.closest(".slot");
+        placeOne(r, slot ? round.q.slotEls[r].indexOf(slot) : round.q.grid[r].indexOf(false));
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    move(e);
+  });
+}
+
+// ----- answering (typed, so the choices never give the answer away) -----
+function keypadHTML() {
+  const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, "⌫", 0, "✔"].map(k =>
+    `<button data-k="${k}" ${k === "✔" ? 'class="ok"' : k === "⌫" ? 'class="ghost"' : ""}>${k}</button>`).join("");
+  return `<div class="ansbox" id="ans">?</div><div class="keypad">${keys}</div>`;
+}
+const bindKeypad = () => document.querySelectorAll(".keypad button").forEach(b => b.onclick = () => pressKey(b.dataset.k));
+
+function showAnswer() {
+  typed = "";
+  document.getElementById("panel").innerHTML = `
+    <div class="total">כמה ביצים יש בקן בסך הכול?</div>
+    ${keypadHTML()}
+    <div class="row"><button class="ghost" id="hint">💡 עזרו לי לספור</button></div>`;
+  bindKeypad();
+  document.getElementById("hint").onclick = showHint;
+  document.getElementById("nest").scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+}
+
+function pressKey(k) {
+  const fighting = battle && battle.phase === "ask";
+  if (!fighting && (!round || round.q.phase !== "answer")) return;
+  sfx.key();
+  if (k === "⌫") typed = typed.slice(0, -1);
+  else if (k === "✔") return fighting ? battleSubmit() : submit();
+  else if (typed.length < 3) typed += k;
+  document.getElementById("ans").textContent = typed || "?";
+}
+window.addEventListener("keydown", e => {
+  if (e.key >= "0" && e.key <= "9") pressKey(e.key);
+  else if (e.key === "Backspace") pressKey("⌫");
+  else if (e.key === "Enter") pressKey("✔");
+});
+
+function showHint() {
+  const q = round.q;
+  q.hinted = true;
+  q.rowEls.forEach((row, r) => row.querySelector(".count").textContent = (r + 1) * q.cols);
+  document.getElementById("msg").textContent = `ספרו בקפיצות של ${q.cols} כשיורדים בשורות 😉`;
+}
+
+function submit() {
+  const q = round.q;
+  if (!typed) return;
+  const box = document.getElementById("ans");
+  if (Number(typed) !== q.rows * q.cols) {
+    q.misses++;
+    sfx.wrong();
+    box.classList.remove("bad"); void box.offsetWidth; box.classList.add("bad");
+    document.getElementById("msg").textContent = "כמעט! הסתכלו על הקן ונסו שוב 🤔";
+    typed = ""; box.textContent = "?";
+    if (q.misses >= 2 && !q.hinted) showHint();
+    return;
+  }
+  q.phase = "done";
+  if (q.misses === 0 && !q.hinted) round.stars++;
+  box.classList.add("good");
+  sfx.right();
+  setTimeout(() => { document.getElementById("nest").classList.add("wobble"); sfx.wobble(); }, 450);
+  setTimeout(hatch, 1300);
+}
+
+function hatch() {
+  const q = round.q, d = DRAGONS[q.table];
+  q.rowEls.forEach((row, r) => row.querySelector(".count").textContent = (r + 1) * q.cols);
+  document.getElementById("nest").classList.remove("wobble");
+  save.hatched[q.table] = (save.hatched[q.table] || 0) + 1;
+  writeSave();
+  sfx.hatch();
+  const last = round.i + 1 === round.qs.length;
+  document.getElementById("panel").innerHTML = `
+    <div class="total">${ltr(`${q.rows} × ${q.cols} = ${q.rows * q.cols}`)}</div>
+    <div class="hatched">${dragonSVG(d)}</div>`;
+  document.getElementById("msg").innerHTML = `הידד! ${d.name} בקע!
+    <div class="row"><button class="alt" id="turn">סובבו את הקן 🔄</button><button id="next">${last ? "סיום" : "הקן הבא"} ⬅</button></div>`;
+  document.getElementById("turn").onclick = turnNest;
+  document.getElementById("next").onclick = next;
+}
+
+// Same eggs turned sideways: rows × cols becomes cols × rows.
+function turnNest() {
+  const q = round.q;
+  sfx.pick();
+  [q.rows, q.cols] = [q.cols, q.rows];
+  document.getElementById("card").style.setProperty("--cell", cellSize(q.rows, q.cols) + "px");
+  buildNest(q, true);
+  document.getElementById("panel").querySelector(".total").textContent = `סובבנו! עכשיו ${ltr(`${q.rows} × ${q.cols} = ${q.rows * q.cols}`)}. אותן ביצים!`;
+  document.getElementById("turn").remove();
+}
+
+function next() { round.i++; nextQuestion(); }
+
+function showResults() {
+  const s = round.stars, n = round.qs.length, isMix = round.level === "mix";
+  const first = Number(round.level);
+  const was = !isMix && cleared(first);
+  if (!isMix) save.best[first] = Math.max(save.best[first] || 0, s);
+  writeSave();
+  const passed = isMix ? s >= PASS_MARK : s >= PASS_MARK;
+  const nextLevel = LEVELS[LEVELS.indexOf(first) + 1];
+  const newUnlock = !isMix && passed && !was;
+  let text = s === n ? "מושלם! אלוף הדרקונים! 🏆" : passed ? "כל הכבוד, מאלף דרקונים! 🎉" : `אספו ${PASS_MARK} כוכבים כדי לפתוח את השלב הבא. אתם יכולים! 💪`;
+  if (newUnlock) text += nextLevel ? `<br>🔓 נפתח שלב חדש: לוח הכפל של ${nextLevel}!` : "<br>🔓 מיקס אלוף הדרקונים נפתח!";
+  (passed ? (newUnlock ? sfx.unlock : sfx.right) : sfx.pick)();
+  app.innerHTML = `
+    <div class="card"><div class="hero bob">${dragonSVG(DRAGONS[isMix ? 10 : first])}</div>
+      <h1>הסיבוב הסתיים!</h1>
+      <p class="sub">${"⭐".repeat(s) || "—"}<br>${s} מתוך ${n} נכונים בניסיון הראשון<br>${text}</p>
+      <div class="row">
+        <button id="again">שחקו שוב</button>
+        ${newUnlock && nextLevel ? `<button class="alt" id="nextlvl">השלב הבא ⬅</button>` : ""}
+        <button class="ghost" id="map">מפה 🗺️</button>
+      </div></div>`;
+  document.getElementById("again").onclick = () => startRound(round.level);
+  if (newUnlock && nextLevel) document.getElementById("nextlvl").onclick = () => startRound(nextLevel);
+  document.getElementById("map").onclick = showMap;
+}
+
+// ===== Zombie Battle: optional, spend your hatched dragons on defending the castle =====
+// Pick a dragon, answer a question from its table, and a right answer unleashes its own attack.
+// Every dragon hits differently; ones you've hatched more of hit a bit harder. Zombies are tough,
+// and only a wrong answer lets one step closer. Each map level you open adds a new zombie kind;
+// every battle draws random zombies from all the kinds you've unlocked so far.
+const ATTACKS = {
+  2:  { name: "זריקת קוקוס",   icon: "🥥", glow: "#c98a4b", shots: 1, arc: true,  spin: 540,  sound: "coconut" },
+  3:  { name: "סופת עלים",     icon: "🍃", glow: "#2fb55a", shots: 3, arc: false, spin: 360,  sound: "leaf" },
+  4:  { name: "יריקת לבה",      icon: "🌋", glow: "#ff4a1c", shots: 1, arc: true,  spin: 0,    sound: "lava" },
+  5:  { name: "פיצוץ בועות",   icon: "🫧", glow: "#4aa8ff", shots: 3, arc: true,  spin: 0,    sound: "bubble" },
+  6:  { name: "פצצת נבגים",     icon: "🍄", glow: "#a66bff", shots: 2, arc: true,  spin: 180,  sound: "spore" },
+  7:  { name: "רסיסי קרח",     icon: "❄️", glow: "#7de3e3", shots: 3, arc: false, spin: 720,  sound: "ice" },
+  8:  { name: "כדור אש",       icon: "🔥", glow: "#ff9a2e", shots: 2, arc: false, spin: 0,    sound: "fire" },
+  9:  { name: "גל לבבות",     icon: "💖", glow: "#ff5c9a", shots: 3, arc: true,  spin: 0,    sound: "heart" },
+  10: { name: "קרן כוכבים",      icon: "⭐", glow: "#ffd34d", shots: 4, arc: false, spin: 1080, sound: "star" },
+};
+for (const t of LEVELS) ATTACKS[t].dmg = t;                  // tougher table, harder hit: 2 up to 10
+const ZOMBIES = 6, HEARTS = 3, START_DIST = 4;
+const army = () => LEVELS.filter(t => save.hatched[t]);
+// +1 for every 5 times you've hatched it (max +2); never more than 60% of a zombie, so no one-hit wins.
+const power = t => ATTACKS[t].dmg + Math.min(2, Math.floor(((save.hatched[t] || 1) - 1) / 5));
+const hitDamage = (t, maxHp) => Math.min(power(t), Math.ceil(maxHp * .6));
+const zombieLeft = dist => 30 + dist * 12;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+let battle = null;
+
+// Newest unlocked kind always shows up once; the rest are random picks from every unlocked kind.
+function zombieQueue() {
+  const pool = ZTYPES.filter((_, i) => unlocked(LEVELS[i]));
+  const q = [pool[pool.length - 1]];
+  while (q.length < ZOMBIES) q.push(pool[rand(pool.length)]);
+  return shuffle(q);
+}
+
+function startBattle() {
+  ensureAudio();
+  round = null;
+  battle = { i: 0, hearts: HEARTS, phase: "pick", queue: zombieQueue() };
+  newZombie();
+  renderBattle();
+  showPick();
+}
+
+function newZombie() {
+  battle.z = battle.queue[battle.i];
+  battle.dist = START_DIST;
+  battle.maxHp = battle.hp = battle.z.hp;
+}
+
+function battleStatus() {
+  return `זומבי ${Math.min(battle.i + 1, ZOMBIES)} מתוך ${ZOMBIES} · ${"❤️".repeat(battle.hearts)}${"🖤".repeat(HEARTS - battle.hearts)}`;
+}
+
+function setHp() {
+  const zom = document.getElementById("zom");
+  zom.querySelector(".hpbar i").style.width = (battle.hp / battle.maxHp * 100) + "%";
+  zom.querySelector(".hpbar span").textContent = battle.hp;
+}
+
+function renderBattle() {
+  app.innerHTML = `
+    <div class="card">
+      <div class="topbar"><button class="ghost" id="home">✕</button><span id="bstat">${battleStatus()}</span>${muteBtn()}</div>
+      <div class="field" id="field">
+        <div class="castle">🏰</div>
+        <div class="hero-slot" id="hero"></div>
+        <div class="zombie" id="zom" style="left:${zombieLeft(battle.dist)}%"><div class="hpbar"><i style="width:100%"></i><span>${battle.hp}</span></div>${zombieSVG(battle.z)}</div>
+      </div>
+      <div id="panel"></div>
+      <div class="msg" id="msg">${battle.z.name} מופיע! 🧟</div>
+    </div>`;
+  document.getElementById("home").onclick = showMap;
+  bindMute();
+}
+
+function showPick() {
+  battle.phase = "pick";
+  document.getElementById("hero").innerHTML = "";
+  const cards = army().map(t => {
+    const d = DRAGONS[t], atk = ATTACKS[t];
+    return `<button class="fighter" data-t="${t}"><span class="av bob">${dragonSVG(d)}</span><b>${d.name}</b><small>${atk.icon} ${atk.name}<br>כפל ${t} · 💥 ${power(t)}</small></button>`;
+  }).join("");
+  document.getElementById("panel").innerHTML = `<div class="total">בחרו דרקון ללחימה!</div><div class="team">${cards}</div>`;
+  document.querySelectorAll(".fighter").forEach(b => b.onclick = () => showAsk(Number(b.dataset.t)));
+}
+
+function showAsk(t) {
+  const d = DRAGONS[t], other = 1 + rand(10), swap = Math.random() < .5;
+  battle.phase = "ask"; typed = "";
+  battle.q = { t, a: swap ? other : t, b: swap ? t : other };
+  document.getElementById("hero").innerHTML = dragonSVG(d);
+  document.getElementById("hero").classList.add("bob");
+  document.getElementById("panel").innerHTML = `
+    <div class="total">${d.name} צריך את העזרה שלך! <b dir="ltr">${battle.q.a} × ${battle.q.b} = ?</b></div>
+    ${keypadHTML()}
+    <div class="row"><button class="ghost" id="swap">בחרו דרקון אחר</button></div>`;
+  document.getElementById("msg").textContent = "";
+  bindKeypad();
+  document.getElementById("swap").onclick = showPick;
+}
+
+// A projectile flies from the dragon to the zombie; arcing ones lob over, spinning ones tumble.
+function shoot(field, atk, target, k) {
+  const el = document.createElement("div");
+  el.className = "fire"; el.textContent = atk.icon;
+  el.style.filter = `drop-shadow(0 0 7px ${atk.glow})`;
+  field.appendChild(el);
+  const frames = [
+    { left: "30%", bottom: "30%", transform: "rotate(0deg) scale(.7)" },
+    { left: (30 + target) / 2 + "%", bottom: atk.arc ? "78%" : "30%", transform: `rotate(${atk.spin / 2}deg) scale(1)` },
+    { left: target + "%", bottom: "30%", transform: `rotate(${atk.spin}deg) scale(1.2)` },
+  ];
+  return el.animate(frames, { duration: 450, delay: k * 120, easing: "ease-in", fill: "both" }).finished.catch(() => {}).then(() => el.remove());
+}
+
+function burst(field, atk, left) {
+  const el = document.createElement("div");
+  el.className = "fire"; el.textContent = atk.icon;
+  el.style.left = left + "%"; el.style.filter = `drop-shadow(0 0 10px ${atk.glow})`;
+  field.appendChild(el);
+  el.animate([{ transform: "scale(.6)", opacity: 1 }, { transform: "scale(2.8)", opacity: 0 }], { duration: 500 }).finished.catch(() => {}).then(() => el.remove());
+}
+
+async function battleSubmit() {
+  const b = battle, { t, a, b: c } = b.q, atk = ATTACKS[t], zom = document.getElementById("zom"), msg = document.getElementById("msg");
+  if (!typed) return;
+  const right = Number(typed) === a * c;
+  b.phase = "busy";
+  document.getElementById("panel").querySelector(".keypad").style.opacity = .4;
+  if (right) {
+    const dmg = hitDamage(t, b.maxHp), field = document.getElementById("field"), target = zombieLeft(b.dist) + 2;
+    attackSfx[atk.sound]();
+    await Promise.all(Array.from({ length: atk.shots }, (_, k) => shoot(field, atk, target, k)));
+    if (battle !== b) return;
+    burst(field, atk, target);
+    b.hp = Math.max(0, b.hp - dmg);
+    setHp();
+    zom.classList.add("hit");
+    msg.textContent = `${DRAGONS[t].name} משתמש ב${atk.name}! ${ltr("-" + dmg)} 💥`;
+    await wait(600);
+    if (battle !== b) return;
+    zom.classList.remove("hit");
+    if (b.hp > 0) {
+      msg.textContent = "הזומבי עדיין עומד! תנו לו שוב! 💪";
+      await wait(700);
+      if (battle !== b) return;
+      return showPick();
+    }
+    sfx.right();
+    zom.classList.add("down");
+    msg.textContent = `${b.z.name} הובס! 🎉`;
+    await wait(800);
+    if (battle !== b) return;
+    return nextZombie();
+  }
+  sfx.wrong();
+  msg.textContent = `כמעט! ${ltr(`${a} × ${c} = ${a * c}`)}. הזומבי מתקרב!`;
+  await wait(1100);
+  if (battle !== b) return;
+  await zombieStep();
+}
+
+async function zombieStep() {
+  const b = battle, zom = document.getElementById("zom");
+  b.dist--;
+  if (b.dist >= 0) {
+    zom.style.left = zombieLeft(b.dist) + "%";
+    sfx.groan();
+    await wait(600);
+    if (battle !== b) return;
+    return showPick();
+  }
+  // reached the castle
+  zom.style.left = zombieLeft(0) - 12 + "%";
+  await wait(500);
+  if (battle !== b) return;
+  zom.classList.add("bite");
+  sfx.groan(); sfx.wrong();
+  b.hearts--;
+  document.getElementById("bstat").textContent = battleStatus();
+  document.getElementById("msg").textContent = "אם-אם! הזומבי נגס בטירה! 💔";
+  await wait(900);
+  if (battle !== b) return;
+  if (b.hearts === 0) return endBattle(false);
+  nextZombie();
+}
+
+function nextZombie() {
+  battle.i++;
+  if (battle.i >= ZOMBIES) return endBattle(true);
+  newZombie();
+  renderBattle();
+  showPick();
+}
+
+function endBattle(won) {
+  const hearts = battle.hearts;
+  (won ? sfx.unlock : sfx.wrong)();
+  app.innerHTML = `
+    <div class="card"><div class="hero bob">${won ? dragonSVG(DRAGONS[army()[0]]) : zombieSVG(ZTYPES[0])}</div>
+      <h1>${won ? "הטירה בטוחה!" : "הזומבים נכנסו!"}</h1>
+      <p class="sub">${won ? `הדרקונים שלך ניצחו את כל הזומבים ונשארו לך ${"❤️".repeat(hearts)}!` : "התאמנו על לוחות הכפל ונסו שוב. אתם יכולים! 💪"}</p>
+      <div class="row"><button id="again">להילחם שוב 🧟</button><button class="ghost" id="map">מפה 🗺️</button></div></div>`;
+  document.getElementById("again").onclick = startBattle;
+  document.getElementById("map").onclick = showMap;
+}
+
+showMap();
+</script>
+</body>
+</html>
