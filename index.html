@@ -113,10 +113,19 @@
   .zombie.bite svg { animation: shake .3s 2; }
   .fire { position: absolute; bottom: 30%; left: 30%; font-size: 2.2rem; line-height: 1; pointer-events: none; }
   .team { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
-  .fighter { display: flex; flex-direction: column; align-items: center; width: 96px; padding: 8px 4px; background: #fff; color: var(--ink); border: 3px solid #e9dcc0; font-size: .85rem; }
+  .fighter { display: flex; flex-direction: column; align-items: center; width: 108px; padding: 8px 4px; background: #fff; color: var(--ink); border: 3px solid #e9dcc0; font-size: .85rem; }
   .fighter .av { width: 60px; height: 60px; }
   .fighter small { font-weight: 400; }
   .fighter:hover { border-color: var(--accent); }
+
+  /* tricks */
+  .tricklist { display: flex; flex-direction: column; gap: 12px; }
+  .tricklist .node { width: 100%; }
+  .chips { direction: ltr; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 6px 0; }
+  .chip { width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #e9dcc0; color: var(--ink); }
+  .chip.on { background: var(--accent); color: #fff; }
+  .slot.gone, .nrow.gone { opacity: .22; filter: grayscale(1); transition: opacity .4s, filter .4s; }
+  .fighter.special { border-color: #ffd34d; background: #fff9db; }
 
   @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
   @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
@@ -142,6 +151,9 @@ const DRAGONS = {
   8:  { name: "להבה",   c: "#ff9a2e", dk: "#d3620a", bel: "#ffe2a8", horn: "big",   wing: "big",   mark: "spots" },
   9:  { name: "ורדית",   c: "#ff8fc0", dk: "#d4508c", bel: "#ffe0ef", horn: "ears",  wing: "small", mark: "heart" },
   10: { name: "נצנץ", c: "#ffc933", dk: "#d49a00", bel: "#fff4c2", horn: "crown", wing: "big",   mark: "star" },
+  // special dragons, earned by learning a trick (not hatched)
+  halfie: { name: "חצי-חצי", c: "#38d9a9", dk: "#12a37a", bel: "#d3fff0", horn: "fin",  wing: "big", mark: "num", num: "5", aura: "#ffe066" },
+  nina:   { name: "נינה",    c: "#4c6ef5", dk: "#2b3fb0", bel: "#dbe4ff", horn: "big",  wing: "big", mark: "num", num: "9", aura: "#74c0fc" },
 };
 const LEVELS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 const ISLANDS = ["🌴", "🌲", "🌋", "🏖️", "🍄", "❄️", "🏜️", "🌊", "🏰"];
@@ -150,6 +162,7 @@ const ROUND_LENGTH = 5, MASTER_LENGTH = 8, PASS_MARK = 3;
 function dragonSVG(d) {
   const { c, dk, bel, horn, wing, mark } = d;
   let s = `<svg class="dragon" viewBox="0 0 100 100" aria-hidden="true">`;
+  if (d.aura) s += `<circle cx="50" cy="58" r="50" fill="${d.aura}" opacity=".28"/><circle cx="50" cy="58" r="38" fill="${d.aura}" opacity=".25"/><text x="6" y="22" font-size="14" fill="${d.aura}">✦</text><text x="84" y="30" font-size="11" fill="${d.aura}">✦</text><text x="88" y="72" font-size="9" fill="${d.aura}">✦</text>`;
   s += `<path d="M66 84 Q94 88 90 62 Q84 76 68 74 Z" fill="${c}"/><path d="M90 62 L97 57 L94 69 Z" fill="${dk}"/>`;
   if (wing !== "none") {
     const k = wing === "big" ? 1 : .7;
@@ -172,6 +185,7 @@ function dragonSVG(d) {
   s += `<path d="M44 56 Q50 62 56 56" stroke="#2a1a3a" stroke-width="2" fill="none" stroke-linecap="round"/>`;
   if (mark === "spots") s += `<circle cx="58" cy="24" r="3" fill="${dk}" opacity=".5"/><circle cx="46" cy="22" r="2" fill="${dk}" opacity=".5"/><circle cx="62" cy="68" r="3" fill="${dk}" opacity=".4"/>`;
   if (mark === "star") s += `<text x="50" y="30" font-size="11" text-anchor="middle" fill="#ffd34d" stroke="#c98a00" stroke-width=".5">★</text>`;
+  if (mark === "num") s += `<text x="50" y="83" font-size="15" font-weight="700" text-anchor="middle" fill="${dk}">${d.num}</text>`;
   if (mark === "heart") s += `<text x="50" y="82" font-size="12" text-anchor="middle" fill="#ff5c9a">♥</text>`;
   if (horn === "crown") s += `<path d="M36 20 L36 6 L43 13 L50 2 L57 13 L64 6 L64 20 Z" fill="#ffd34d" stroke="#d49a00" stroke-width="1.5" stroke-linejoin="round"/>`;
   return s + `</svg>`;
@@ -267,6 +281,8 @@ const attackSfx = {
   ice:     () => [2093, 1760, 1568, 1318].forEach((f, i) => tone(f, i * .06, .18, { type: "sine", vol: .1 })),
   coconut: () => { tone(260, 0, .15, { type: "sine", vol: .2, to: 110 }); tone(90, .3, .15, { type: "sine", vol: .25, to: 50 }); },
   heart:   () => [NOTE.C, NOTE.E, NOTE.G].forEach((f, i) => tone(f, i * .08, .2, { type: "sine", vol: .14 })),
+  five:    () => { crack(0, .08); tone(900, 0, .1, { type: "square", vol: .08 }); crack(.12, .1); tone(1400, .12, .15, { type: "triangle", vol: .12 }); },
+  row:     () => [880, 660, 440].forEach((f, i) => tone(f, i * .09, .12, { type: "square", vol: .06 })),
   star:    () => [NOTE.G, NOTE.C2, NOTE.E2, NOTE.G * 2].forEach((f, i) => tone(f, i * .06, .2, { type: "triangle", vol: .12 })),
 };
 function toggleMute() {
@@ -285,6 +301,7 @@ function loadSave() {
   try { s = JSON.parse(localStorage.getItem("dragonsHeV2") || "{}"); } catch {}
   s.hatched = s.hatched || {};
   s.best = s.best || {};
+  s.tricks = s.tricks || {};
   return s;
 }
 function writeSave() { try { localStorage.setItem("dragonsHeV2", JSON.stringify(save)); } catch {} }
@@ -296,12 +313,13 @@ const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).
 const cleared = t => (save.best[t] || 0) >= PASS_MARK;
 const unlockAll = () => location.hash === "#unlock";
 const unlocked = t => unlockAll() || t === LEVELS[0] || cleared(LEVELS[LEVELS.indexOf(t) - 1]);
+const trickDone = k => unlockAll() || (save.tricks[k] || 0) >= PASS_MARK;
 const masterUnlocked = () => unlockAll() || LEVELS.every(cleared);
 const medal = n => n >= 5 ? 3 : n === 4 ? 2 : n >= PASS_MARK ? 1 : 0;
 
 // ===== Map screen (home) =====
 function showMap() {
-  battle = null;
+  battle = null; practice = null;
   const nodes = LEVELS.map((t, i) => {
     const d = DRAGONS[t], open = unlocked(t), done = cleared(t), m = medal(save.best[t] || 0);
     const cls = done ? "cleared" : open ? "open" : "locked";
@@ -323,11 +341,13 @@ function showMap() {
       <p class="sub">בנו קנים, בקעו דרקונים וטיילו במפה!</p>
       <div class="map">${nodes.join('<div class="trail">· · ·</div>')}<div class="trail">· · ·</div>${master}</div>
       <div class="row"><button class="alt" id="coll">הדרקונים שלי 🐲</button>
+        <button id="tricks" class="alt">טריקים 🪄</button>
         <button id="zbattle" ${army().length ? "" : "disabled"}>קרב זומבים 🧟</button></div>
       ${army().length ? "" : `<p class="sub">בקעו דרקון כדי לפתוח את קרב הזומבים!</p>`}
     </div>`;
   bindMute();
   document.getElementById("zbattle").onclick = startBattle;
+  document.getElementById("tricks").onclick = showTricks;
   app.querySelectorAll(".node").forEach(b => b.onclick = () => {
     const t = b.dataset.t;
     if (t === "mix" ? !masterUnlocked() : !unlocked(Number(t))) return sfx.wrong();
@@ -341,8 +361,14 @@ function showCollection() {
     const d = DRAGONS[t], n = save.hatched[t] || 0;
     return `<div class="${n ? "" : "locked"}"><div class="e">${dragonSVG(d)}</div><b>${n ? d.name : "???"}</b><small>לוח הכפל של ${t}${n ? ` · בקעו ${n}` : ""}</small></div>`;
   }).join("");
+  const specials = Object.entries(TRICKS).map(([k, t]) => {
+    const d = DRAGONS[t.dragon], done = trickDone(k);
+    return `<div class="${done ? "" : "locked"}"><div class="e">${dragonSVG(d)}</div><b>${done ? d.name : "???"}</b><small>${t.title}</small></div>`;
+  }).join("");
   app.innerHTML = `<div class="card"><h1>הדרקונים שלי</h1><p class="sub">בקעו ביצים מלוח כפל כדי לפגוש את הדרקון שלו.</p>
-    <div class="coll">${cells}</div><div class="row"><button id="back">חזרה למפה</button></div></div>`;
+    <div class="coll">${cells}</div>
+    <h2 style="margin-top:16px">דרקוני טריקים ✨</h2><p class="sub">למדו טריק כדי לזכות בדרקון מיוחד.</p>
+    <div class="coll">${specials}</div><div class="row"><button id="back">חזרה למפה</button></div></div>`;
   document.getElementById("back").onclick = showMap;
 }
 
@@ -351,7 +377,7 @@ let round = null, typed = "";
 
 function startRound(level) {
   ensureAudio();
-  battle = null;
+  battle = null; practice = null;
   const qs = [];
   if (level === "mix") {
     for (let i = 0; i < MASTER_LENGTH; i++) qs.push({ table: LEVELS[rand(LEVELS.length)], other: 1 + rand(10) });
@@ -528,11 +554,11 @@ function showAnswer() {
 }
 
 function pressKey(k) {
-  const fighting = battle && battle.phase === "ask";
-  if (!fighting && (!round || round.q.phase !== "answer")) return;
+  const fighting = battle && battle.phase === "ask", tricking = practice && practice.phase === "ask";
+  if (!fighting && !tricking && (!round || round.q.phase !== "answer")) return;
   sfx.key();
   if (k === "⌫") typed = typed.slice(0, -1);
-  else if (k === "✔") return fighting ? battleSubmit() : submit();
+  else if (k === "✔") return fighting ? battleSubmit() : tricking ? practiceSubmit() : submit();
   else if (typed.length < 3) typed += k;
   document.getElementById("ans").textContent = typed || "?";
 }
@@ -644,10 +670,17 @@ const ATTACKS = {
 };
 for (const t of LEVELS) ATTACKS[t].dmg = t;                  // tougher table, harder hit: 2 up to 10
 const ZOMBIES = 6, HEARTS = 3, START_DIST = 4;
-const army = () => LEVELS.filter(t => save.hatched[t]);
+// Trick dragons: special attacks, earned in the Tricks section. They ask questions from their own table.
+ATTACKS.halfie = { name: "מחיאת כף ענקית", icon: "🖐️", glow: "#38d9a9", shots: 1, arc: false, spin: 720, sound: "five", dmg: 5, table: 5, special: "half", trick: "five", ability: "✨ חותך חצי מהחיים של הזומבי!" };
+ATTACKS.nina   = { name: "מעיף השורות", icon: "➖➖➖", glow: "#4c6ef5", shots: 1, arc: false, spin: 0, sound: "row", dmg: 9, table: 9, special: "push", trick: "nine", ability: "✨ דוחף את הזומבי צעד אחורה!" };
+const army = () => [...LEVELS.filter(t => save.hatched[t]), ...Object.keys(TRICKS).filter(trickDone).map(k => TRICKS[k].dragon)];
 // +1 for every 5 times you've hatched it (max +2); never more than 60% of a zombie, so no one-hit wins.
 const power = t => ATTACKS[t].dmg + Math.min(2, Math.floor(((save.hatched[t] || 1) - 1) / 5));
-const hitDamage = (t, maxHp) => Math.min(power(t), Math.ceil(maxHp * .6));
+function damageFor(t, b) {
+  let d = power(t);
+  if (ATTACKS[t].special === "half") d = Math.max(d, Math.floor(b.hp / 2));   // High-Five Smash: half of what's left
+  return Math.min(d, Math.ceil(b.maxHp * .6));
+}
 const zombieLeft = dist => 30 + dist * 12;
 const wait = ms => new Promise(r => setTimeout(r, ms));
 let battle = null;
@@ -662,7 +695,7 @@ function zombieQueue() {
 
 function startBattle() {
   ensureAudio();
-  round = null;
+  round = null; practice = null;
   battle = { i: 0, hearts: HEARTS, phase: "pick", queue: zombieQueue() };
   newZombie();
   renderBattle();
@@ -706,25 +739,27 @@ function showPick() {
   document.getElementById("hero").innerHTML = "";
   const cards = army().map(t => {
     const d = DRAGONS[t], atk = ATTACKS[t];
-    return `<button class="fighter" data-t="${t}"><span class="av bob">${dragonSVG(d)}</span><b>${d.name}</b><small>${atk.icon} ${atk.name}<br>כפל ${t} · 💥 ${power(t)}</small></button>`;
+    return `<button class="fighter${atk.special ? " special" : ""}" data-t="${t}"><span class="av bob">${dragonSVG(d)}</span><b>${d.name}</b><small>${atk.icon} ${atk.name}<br>כפל ${atk.table || t} · 💥 ${power(t)}${atk.ability ? `<br>${atk.ability}` : ""}</small></button>`;
   }).join("");
   document.getElementById("panel").innerHTML = `<div class="total">בחרו דרקון ללחימה!</div><div class="team">${cards}</div>`;
-  document.querySelectorAll(".fighter").forEach(b => b.onclick = () => showAsk(Number(b.dataset.t)));
+  document.querySelectorAll(".fighter").forEach(b => b.onclick = () => showAsk(isNaN(b.dataset.t) ? b.dataset.t : Number(b.dataset.t)));
 }
 
 function showAsk(t) {
-  const d = DRAGONS[t], other = 1 + rand(10), swap = Math.random() < .5;
+  const d = DRAGONS[t], atk = ATTACKS[t], tn = atk.table || t, other = 1 + rand(10), swap = Math.random() < .5;
   battle.phase = "ask"; typed = "";
-  battle.q = { t, a: swap ? other : t, b: swap ? t : other };
+  battle.q = { t, other, a: swap ? other : tn, b: swap ? tn : other };
   document.getElementById("hero").innerHTML = dragonSVG(d);
   document.getElementById("hero").classList.add("bob");
   document.getElementById("panel").innerHTML = `
     <div class="total">${d.name} צריך את העזרה שלך! <b dir="ltr">${battle.q.a} × ${battle.q.b} = ?</b></div>
     ${keypadHTML()}
-    <div class="row"><button class="ghost" id="swap">בחרו דרקון אחר</button></div>`;
+    <div class="row"><button class="ghost" id="swap">בחרו דרקון אחר</button>${atk.trick ? `<button class="alt" id="tip">💡 השתמשו בטריק</button>` : ""}</div>`;
   document.getElementById("msg").textContent = "";
   bindKeypad();
   document.getElementById("swap").onclick = showPick;
+  const tip = document.getElementById("tip");
+  if (tip) tip.onclick = () => document.getElementById("msg").textContent = `${ltr(`10 × ${other} = ${10 * other}`)}. ${TRICKS[atk.trick].then(other)}`;
 }
 
 // A projectile flies from the dragon to the zombie; arcing ones lob over, spinning ones tumble.
@@ -756,7 +791,7 @@ async function battleSubmit() {
   b.phase = "busy";
   document.getElementById("panel").querySelector(".keypad").style.opacity = .4;
   if (right) {
-    const dmg = hitDamage(t, b.maxHp), field = document.getElementById("field"), target = zombieLeft(b.dist) + 2;
+    const dmg = damageFor(t, b), field = document.getElementById("field"), target = zombieLeft(b.dist) + 2;
     attackSfx[atk.sound]();
     await Promise.all(Array.from({ length: atk.shots }, (_, k) => shoot(field, atk, target, k)));
     if (battle !== b) return;
@@ -769,7 +804,13 @@ async function battleSubmit() {
     if (battle !== b) return;
     zom.classList.remove("hit");
     if (b.hp > 0) {
-      msg.textContent = "הזומבי עדיין עומד! תנו לו שוב! 💪";
+      let note = "הזומבי עדיין עומד! תנו לו שוב! 💪";
+      if (atk.special === "push" && b.dist < START_DIST) {
+        b.dist++;
+        zom.style.left = zombieLeft(b.dist) + "%";
+        note = "וואו! הזומבי נדחף צעד אחורה! ➡️";
+      }
+      msg.textContent = note;
       await wait(700);
       if (battle !== b) return;
       return showPick();
@@ -831,6 +872,177 @@ function endBattle(won) {
       <div class="row"><button id="again">להילחם שוב 🧟</button><button class="ghost" id="map">מפה 🗺️</button></div></div>`;
   document.getElementById("again").onclick = startBattle;
   document.getElementById("map").onclick = showMap;
+}
+
+// ===== Tricks: short lessons that each earn a special dragon =====
+// Both tricks use the nest picture: 10 rows of n eggs, then take some rows away (half of them for x5, one for x9).
+const TRICKS = {
+  five: { title: "טריק הכפל ב-5", icon: "🖐️", dragon: "halfie", factor: 5,
+          rule: "קודם כופלים ב-10, ואז מורידים חצי!",
+          then: n => "עכשיו מורידים חצי!" },
+  nine: { title: "טריק הכפל ב-9", icon: "9️⃣", dragon: "nina", factor: 9,
+          rule: "קודם כופלים ב-10, ואז מורידים שורה אחת!",
+          then: n => `עכשיו מורידים שורה אחת של ${n}!` },
+};
+let practice = null;
+
+function showTricks() {
+  battle = null; practice = null;
+  const cards = Object.entries(TRICKS).map(([k, t]) => {
+    const d = DRAGONS[t.dragon], done = trickDone(k), st = save.tricks[k] || 0;
+    return `<button class="node ${done ? "cleared" : "open"}" data-k="${k}">
+      <span class="av ${done ? "bob" : "locked"}">${dragonSVG(d)}</span>
+      <span class="info">${t.icon} ${t.title}<small>${t.rule}<br>${done ? `זכיתם ב${d.name}! ${"⭐".repeat(st)}` : `זכו ב${d.name}, דרקון מיוחד!`}</small></span></button>`;
+  }).join("");
+  app.innerHTML = `<div class="card">
+    <div class="topbar"><span></span>${muteBtn()}</div>
+    <h1>טריקי קסם 🪄</h1><p class="sub">למדו קיצור דרך, תרגלו אותו וזכו בדרקון מיוחד!</p>
+    <div class="tricklist">${cards}</div>
+    <div class="row"><button class="ghost" id="back">חזרה למפה</button></div></div>`;
+  bindMute();
+  document.getElementById("back").onclick = showMap;
+  app.querySelectorAll(".node").forEach(b => b.onclick = () => showLesson(b.dataset.k));
+}
+
+// the nest for a trick: 10 rows of n eggs; "cut" fades what gets taken away (the bottom 5 rows for x5, the last row for x9); "final" is the answer
+function drawTrickNest(key, n, mode) {
+  const t = TRICKS[key];
+  const q = { rows: mode === "final" ? t.factor : 10, cols: n };
+  Object.assign(q, { table: t.dragon, phase: "trick" });
+  document.getElementById("card").style.setProperty("--cell", cellSize(q.rows, q.cols) + "px");
+  buildNest(q, true);
+  if (mode === "cut") {
+    q.rowEls.slice(t.factor === 5 ? 5 : 9).forEach(row => row.classList.add("gone"));
+  }
+  return q;
+}
+
+function showLesson(key, n = 6) {
+  const t = TRICKS[key], d = DRAGONS[t.dragon];
+  let step = 0;
+  const chips = Array.from({ length: 10 }, (_, i) => `<button class="chip ${i + 1 === n ? "on" : ""}" data-n="${i + 1}">${i + 1}</button>`).join("");
+  app.innerHTML = `
+    <div class="card" id="card">
+      <div class="topbar"><button class="ghost" id="back">✕</button><span>${t.icon} ${t.title}</span>${muteBtn()}</div>
+      <div class="request"><span class="face bob">${dragonSVG(d)}</span><div class="bubble">${t.rule}</div></div>
+      <div class="total">בחרו מספר להכפיל ב-${t.factor}:</div>
+      <div class="chips">${chips}</div>
+      <div class="nest" id="nest"></div>
+      <div class="total" id="eq"></div>
+      <div class="row"><button id="step"></button><button class="alt" id="try">נסו בעצמכם 🎯</button></div>
+    </div>`;
+  bindMute();
+  document.getElementById("back").onclick = showTricks;
+  document.getElementById("try").onclick = () => startPractice(key);
+  document.querySelectorAll(".chip").forEach(b => b.onclick = () => showLesson(key, Number(b.dataset.n)));
+  const draw = () => {
+    const f = t.factor;
+    drawTrickNest(key, n, ["full", "cut", "final"][step]);
+    document.getElementById("eq").innerHTML = [
+      `קודם כופלים ב-10: <b>${ltr(`10 × ${n} = ${10 * n}`)}</b>`,
+      key === "five" ? `מורידים חצי: חצי מ-${10 * n} זה <b>${5 * n}</b>` : `מורידים שורה אחת של ${n}: <b>${ltr(`${10 * n} − ${n} = ${9 * n}`)}</b>`,
+      `אז <b>${ltr(`${f} × ${n} = ${f * n}`)}</b> ✨ טה-דה!`,
+    ][step];
+    document.getElementById("step").textContent = step < 2 ? "השלב הבא ⬅" : "הראו שוב 🔁";
+  };
+  document.getElementById("step").onclick = () => { sfx.pick(); step = (step + 1) % 3; draw(); };
+  draw();
+}
+
+// ----- practice: two typed steps per problem, with the nest to look at -----
+function startPractice(key) {
+  ensureAudio();
+  practice = { key, ns: shuffle([2, 3, 4, 5, 6, 7, 8, 9, 10]).slice(0, 4), i: 0, stars: 0 };
+  nextProblem();
+}
+
+function nextProblem() {
+  const p = practice;
+  if (p.i >= p.ns.length) return practiceResults();
+  Object.assign(p, { n: p.ns[p.i], step: "A", misses: 0, mistakes: 0 });
+  const t = TRICKS[p.key], d = DRAGONS[t.dragon];
+  app.innerHTML = `
+    <div class="card" id="card">
+      <div class="topbar"><button class="ghost" id="back">✕</button><span>תרגיל ${p.i + 1} מתוך ${p.ns.length} · ⭐ ${p.stars}</span>${muteBtn()}</div>
+      <div class="request"><span class="face bob">${dragonSVG(d)}</span><div class="bubble">${d.name} שואל: כמה זה <b dir="ltr">${t.factor} × ${p.n}</b>? השתמשו בטריק!</div></div>
+      <div class="nest" id="nest"></div>
+      <div id="panel"></div>
+      <div class="msg" id="msg"></div>
+    </div>`;
+  bindMute();
+  document.getElementById("back").onclick = showTricks;
+  drawPracticeNest("full");
+  askStep();
+}
+
+function drawPracticeNest(mode) {
+  drawTrickNest(practice.key, practice.n, mode);
+  document.querySelectorAll("#nest .count").forEach(c => c.textContent = "");   // the counts would give the answer away
+}
+
+function askStep() {
+  const p = practice, n = p.n;
+  typed = ""; p.phase = "ask";
+  const text = p.step === "A" ? `שלב 1: כופלים ב-10. <b dir="ltr">10 × ${n} = ?</b>`
+    : p.key === "five" ? `שלב 2: מורידים חצי מ-${10 * n}. כמה נשאר?`
+    : `שלב 2: מורידים שורה אחת של ${n}. <b dir="ltr">${10 * n} − ${n} = ?</b>`;
+  document.getElementById("panel").innerHTML = `<div class="total">${text}</div>${keypadHTML()}`;
+  bindKeypad();
+}
+
+async function practiceSubmit() {
+  const p = practice, t = TRICKS[p.key], n = p.n;
+  if (!typed) return;
+  const want = p.step === "A" ? 10 * n : t.factor * n, box = document.getElementById("ans"), msg = document.getElementById("msg");
+  if (Number(typed) !== want) {
+    p.misses++; p.mistakes++;
+    sfx.wrong();
+    box.classList.remove("bad"); void box.offsetWidth; box.classList.add("bad");
+    msg.textContent = p.misses >= 2 ? `רמז: התשובה היא ${want} 😉` : "כמעט! נסו שוב 🤔";
+    typed = ""; box.textContent = "?";
+    return;
+  }
+  p.phase = "busy";
+  box.classList.add("good");
+  sfx.right();
+  msg.textContent = "";
+  await wait(800);
+  if (practice !== p) return;
+  if (p.step === "A") {
+    p.step = "B"; p.misses = 0;
+    drawPracticeNest("cut");
+    msg.textContent = p.key === "five" ? "חצי מהביצים הורדו! ✂️" : "שורה אחת הורדה! ✂️";
+    return askStep();
+  }
+  if (!p.mistakes) p.stars++;
+  drawTrickNest(p.key, n, "final");
+  const last = p.i + 1 === p.ns.length;
+  document.getElementById("panel").innerHTML = `<div class="total">${ltr(`${t.factor} × ${n} = ${t.factor * n}`)} ✨</div>`;
+  msg.innerHTML = `<div class="row"><button id="next">${last ? "סיום" : "התרגיל הבא"} ⬅</button></div>`;
+  document.getElementById("next").onclick = () => { p.i++; nextProblem(); };
+}
+
+function practiceResults() {
+  const p = practice, t = TRICKS[p.key], d = DRAGONS[t.dragon], s = p.stars, n = p.ns.length;
+  const was = (save.tricks[p.key] || 0) >= PASS_MARK, passed = s >= PASS_MARK, earned = passed && !was;
+  save.tricks[p.key] = Math.max(save.tricks[p.key] || 0, s);
+  writeSave();
+  (earned ? sfx.unlock : passed ? sfx.right : sfx.pick)();
+  const text = earned ? `🎉 זכיתם ב<b>${d.name}</b>!<br>${ATTACKS[t.dragon].ability}<br>מצאו אותו בקרב הזומבים!`
+    : passed ? "כל הכבוד, אלופי הטריקים! 🎉" : `אספו ${PASS_MARK} כוכבים כדי לזכות ב${d.name}. אתם יכולים! 💪`;
+  app.innerHTML = `
+    <div class="card"><div class="hero ${passed ? "bob" : "locked"}">${dragonSVG(d)}</div>
+      <h1>תרגול הטריק הסתיים!</h1>
+      <p class="sub">${"⭐".repeat(s) || "—"}<br>${s} מתוך ${n} נכונים בניסיון הראשון<br>${text}</p>
+      <div class="row">
+        <button id="again">תרגלו שוב</button>
+        ${passed ? `<button class="alt" id="fight">קרב זומבים 🧟</button>` : `<button class="alt" id="learn">חזרה על הטריק</button>`}
+        <button class="ghost" id="tricks">טריקים 🪄</button>
+      </div></div>`;
+  document.getElementById("again").onclick = () => startPractice(p.key);
+  if (passed) document.getElementById("fight").onclick = startBattle;
+  else document.getElementById("learn").onclick = () => showLesson(p.key);
+  document.getElementById("tricks").onclick = showTricks;
 }
 
 showMap();
